@@ -20,13 +20,13 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 )
 
 // CacheComparer is an implementation of the Scheduler's cache comparer.
@@ -34,7 +34,7 @@ type CacheComparer struct {
 	NodeLister corelisters.NodeLister
 	PodLister  corelisters.PodLister
 	Cache      internalcache.Cache
-	PodQueue   internalqueue.SchedulingQueue
+	PodQueue   schedulerqueue.SchedulingQueue
 }
 
 // Compare compares the nodes and pods of NodeLister with Cache.Snapshot.

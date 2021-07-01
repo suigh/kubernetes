@@ -34,7 +34,8 @@ func NewTestQueueWithObjects(
 	opts ...Option,
 ) *PriorityQueue {
 	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(objs...), 0)
-	pq := NewPriorityQueue(lessFn, informerFactory, opts...)
+	pq := &PriorityQueue{}
+	pq.Init(lessFn, informerFactory, opts...)
 	informerFactory.Start(ctx.Done())
 	informerFactory.WaitForCacheSync(ctx.Done())
 	return pq

@@ -57,47 +57,49 @@ func NewInTreeRegistry() runtime.Registry {
 	}
 
 	return runtime.Registry{
-		selectorspread.Name:      selectorspread.New,
-		imagelocality.Name:       imagelocality.New,
-		tainttoleration.Name:     tainttoleration.New,
-		nodename.Name:            nodename.New,
-		nodeports.Name:           nodeports.New,
-		nodepreferavoidpods.Name: nodepreferavoidpods.New,
-		nodeaffinity.Name:        nodeaffinity.New,
-		podtopologyspread.Name:   podtopologyspread.New,
-		nodeunschedulable.Name:   nodeunschedulable.New,
-		noderesources.FitName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewFit(plArgs, fh, fts)
-		},
-		noderesources.BalancedAllocationName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewBalancedAllocation(plArgs, fh, fts)
-		},
-		noderesources.MostAllocatedName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewMostAllocated(plArgs, fh, fts)
-		},
-		noderesources.LeastAllocatedName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewLeastAllocated(plArgs, fh, fts)
-		},
-		noderesources.RequestedToCapacityRatioName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return noderesources.NewRequestedToCapacityRatio(plArgs, fh, fts)
-		},
-		volumebinding.Name:             volumebinding.New,
-		volumerestrictions.Name:        volumerestrictions.New,
-		volumezone.Name:                volumezone.New,
-		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
-		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
-		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
-		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
-		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
-		interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return interpodaffinity.New(plArgs, fh, fts)
-		},
-		nodelabel.Name:       nodelabel.New,
-		serviceaffinity.Name: serviceaffinity.New,
-		queuesort.Name:       queuesort.New,
-		defaultbinder.Name:   defaultbinder.New,
-		defaultpreemption.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-			return defaultpreemption.New(plArgs, fh, fts)
+		Pf: map[string]runtime.PluginFactory{
+			selectorspread.Name:      selectorspread.New,
+			imagelocality.Name:       imagelocality.New,
+			tainttoleration.Name:     tainttoleration.New,
+			nodename.Name:            nodename.New,
+			nodeports.Name:           nodeports.New,
+			nodepreferavoidpods.Name: nodepreferavoidpods.New,
+			nodeaffinity.Name:        nodeaffinity.New,
+			podtopologyspread.Name:   podtopologyspread.New,
+			nodeunschedulable.Name:   nodeunschedulable.New,
+			noderesources.FitName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return noderesources.NewFit(plArgs, fh, fts)
+			},
+			noderesources.BalancedAllocationName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return noderesources.NewBalancedAllocation(plArgs, fh, fts)
+			},
+			noderesources.MostAllocatedName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return noderesources.NewMostAllocated(plArgs, fh, fts)
+			},
+			noderesources.LeastAllocatedName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return noderesources.NewLeastAllocated(plArgs, fh, fts)
+			},
+			noderesources.RequestedToCapacityRatioName: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return noderesources.NewRequestedToCapacityRatio(plArgs, fh, fts)
+			},
+			volumebinding.Name:             volumebinding.New,
+			volumerestrictions.Name:        volumerestrictions.New,
+			volumezone.Name:                volumezone.New,
+			nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
+			nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
+			nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
+			nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
+			nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
+			interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return interpodaffinity.New(plArgs, fh, fts)
+			},
+			nodelabel.Name:       nodelabel.New,
+			serviceaffinity.Name: serviceaffinity.New,
+			queuesort.Name:       queuesort.New,
+			defaultbinder.Name:   defaultbinder.New,
+			defaultpreemption.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+				return defaultpreemption.New(plArgs, fh, fts)
+			},
 		},
 	}
 }

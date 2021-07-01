@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 	"sigs.k8s.io/yaml"
 )
 
@@ -55,34 +56,51 @@ func DecodeInto(obj runtime.Object, into interface{}) error {
 // Registry is a collection of all available plugins. The framework uses a
 // registry to enable and initialize configured plugins.
 // All plugins must be in the registry before initializing the framework.
-type Registry map[string]PluginFactory
+type Registry struct {
+	Pf          map[string]PluginFactory
+	CustomQueue schedulerqueue.SchedulingQueue
+}
 
 // Register adds a new plugin to the registry. If a plugin with the same name
 // exists, it returns an error.
-func (r Registry) Register(name string, factory PluginFactory) error {
-	if _, ok := r[name]; ok {
+func (r *Registry) Register(name string, factory PluginFactory) error {
+	if _, ok := r.Pf[name]; ok {
 		return fmt.Errorf("a plugin named %v already exists", name)
 	}
-	r[name] = factory
+	r.Pf[name] = factory
 	return nil
 }
 
 // Unregister removes an existing plugin from the registry. If no plugin with
 // the provided name exists, it returns an error.
-func (r Registry) Unregister(name string) error {
-	if _, ok := r[name]; !ok {
+func (r *Registry) Unregister(name string) error {
+	if _, ok := r.Pf[name]; !ok {
 		return fmt.Errorf("no plugin named %v exists", name)
 	}
-	delete(r, name)
+	delete(r.Pf, name)
 	return nil
 }
 
 // Merge merges the provided registry to the current one.
-func (r Registry) Merge(in Registry) error {
-	for name, factory := range in {
+func (r *Registry) Merge(in Registry) error {
+	if in.CustomQueue != nil {
+		r.CustomQueue = in.CustomQueue
+	}
+
+	for name, factory := range in.Pf {
 		if err := r.Register(name, factory); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// SetCustomQueue sets custom queue to the registry. If the custom queue is already
+// set, it returns an error.
+func (r *Registry) SetCustomQueue(customQueue schedulerqueue.SchedulingQueue) error {
+	if r.CustomQueue != nil {
+		return fmt.Errorf("custom queue is registered more than one time")
+	}
+	r.CustomQueue = customQueue
 	return nil
 }

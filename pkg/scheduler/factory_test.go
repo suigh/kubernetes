@@ -49,8 +49,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 )
 
 const (
@@ -468,7 +468,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := schedulerqueue.NewPriorityQueue(nil, informerFactory, schedulerqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			queue.Add(testPod)
@@ -542,7 +542,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := schedulerqueue.NewPriorityQueue(nil, informerFactory, schedulerqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			for i := range tt.nodes {
@@ -583,7 +583,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Need to add testPod to the store.
 	podInformer.Informer().GetStore().Add(testPod)
 
-	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+	queue := schedulerqueue.NewPriorityQueue(nil, informerFactory, schedulerqueue.WithClock(clock.NewFakeClock(time.Now())))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
@@ -601,7 +601,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 
 // getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
-func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
+func getPodFromPriorityQueue(queue *schedulerqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {
 	podList := queue.PendingPods()
 	if len(podList) == 0 {
 		return nil

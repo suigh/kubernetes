@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,7 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/internal/heap"
+	"k8s.io/kubernetes/pkg/scheduler/heap"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -76,6 +76,8 @@ type PreEnqueueCheck func(pod *v1.Pod) bool
 // makes it easy to use those data structures as a SchedulingQueue.
 type SchedulingQueue interface {
 	framework.PodNominator
+	// Initialize the queue
+	Init(lessFn framework.LessFunc, informerFactory informers.SharedInformerFactory, opts ...Option)
 	Add(pod *v1.Pod) error
 	// AddUnschedulableIfNotPresent adds an unschedulable pod back to scheduling queue.
 	// The podSchedulingCycle represents the current scheduling cycle number which can be
@@ -103,12 +105,9 @@ type SchedulingQueue interface {
 	Run()
 }
 
-// NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(
-	lessFn framework.LessFunc,
-	informerFactory informers.SharedInformerFactory,
-	opts ...Option) SchedulingQueue {
-	return NewPriorityQueue(lessFn, informerFactory, opts...)
+// NewSchedulingQueue creates a priority queue as a new scheduling queue.
+func NewSchedulingQueue() SchedulingQueue {
+	return &PriorityQueue{}
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -164,56 +163,56 @@ type PriorityQueue struct {
 	nsLister listersv1.NamespaceLister
 }
 
-type priorityQueueOptions struct {
-	clock                     util.Clock
-	podInitialBackoffDuration time.Duration
-	podMaxBackoffDuration     time.Duration
-	podNominator              framework.PodNominator
-	clusterEventMap           map[framework.ClusterEvent]sets.String
+type PriorityQueueOptions struct {
+	Clock                     util.Clock
+	PodInitialBackoffDuration time.Duration
+	PodMaxBackoffDuration     time.Duration
+	PodNominator              framework.PodNominator
+	ClusterEventMap           map[framework.ClusterEvent]sets.String
 }
 
 // Option configures a PriorityQueue
-type Option func(*priorityQueueOptions)
+type Option func(*PriorityQueueOptions)
 
 // WithClock sets clock for PriorityQueue, the default clock is util.RealClock.
 func WithClock(clock util.Clock) Option {
-	return func(o *priorityQueueOptions) {
-		o.clock = clock
+	return func(o *PriorityQueueOptions) {
+		o.Clock = clock
 	}
 }
 
 // WithPodInitialBackoffDuration sets pod initial backoff duration for PriorityQueue.
 func WithPodInitialBackoffDuration(duration time.Duration) Option {
-	return func(o *priorityQueueOptions) {
-		o.podInitialBackoffDuration = duration
+	return func(o *PriorityQueueOptions) {
+		o.PodInitialBackoffDuration = duration
 	}
 }
 
 // WithPodMaxBackoffDuration sets pod max backoff duration for PriorityQueue.
 func WithPodMaxBackoffDuration(duration time.Duration) Option {
-	return func(o *priorityQueueOptions) {
-		o.podMaxBackoffDuration = duration
+	return func(o *PriorityQueueOptions) {
+		o.PodMaxBackoffDuration = duration
 	}
 }
 
 // WithPodNominator sets pod nominator for PriorityQueue.
 func WithPodNominator(pn framework.PodNominator) Option {
-	return func(o *priorityQueueOptions) {
-		o.podNominator = pn
+	return func(o *PriorityQueueOptions) {
+		o.PodNominator = pn
 	}
 }
 
 // WithClusterEventMap sets clusterEventMap for PriorityQueue.
 func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
-	return func(o *priorityQueueOptions) {
-		o.clusterEventMap = m
+	return func(o *PriorityQueueOptions) {
+		o.ClusterEventMap = m
 	}
 }
 
-var defaultPriorityQueueOptions = priorityQueueOptions{
-	clock:                     util.RealClock{},
-	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
-	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+var defaultPriorityQueueOptions = PriorityQueueOptions{
+	Clock:                     util.RealClock{},
+	PodInitialBackoffDuration: DefaultPodInitialBackoffDuration,
+	PodMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -229,12 +228,12 @@ func newQueuedPodInfoForLookup(pod *v1.Pod, plugins ...string) *framework.Queued
 	}
 }
 
-// NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(
+// Init initializes the priority queue
+func (p *PriorityQueue) Init(
 	lessFn framework.LessFunc,
 	informerFactory informers.SharedInformerFactory,
 	opts ...Option,
-) *PriorityQueue {
+) {
 	options := defaultPriorityQueueOptions
 	for _, opt := range opts {
 		opt(&options)
@@ -246,28 +245,24 @@ func NewPriorityQueue(
 		return lessFn(pInfo1, pInfo2)
 	}
 
-	if options.podNominator == nil {
-		options.podNominator = NewPodNominator(informerFactory.Core().V1().Pods().Lister())
+	if options.PodNominator == nil {
+		options.PodNominator = NewPodNominator(informerFactory.Core().V1().Pods().Lister())
 	}
 
-	pq := &PriorityQueue{
-		PodNominator:              options.podNominator,
-		clock:                     options.clock,
-		stop:                      make(chan struct{}),
-		podInitialBackoffDuration: options.podInitialBackoffDuration,
-		podMaxBackoffDuration:     options.podMaxBackoffDuration,
-		activeQ:                   heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
-		unschedulableQ:            newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
-		moveRequestCycle:          -1,
-		clusterEventMap:           options.clusterEventMap,
-	}
-	pq.cond.L = &pq.lock
-	pq.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, pq.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
+	p.PodNominator = options.PodNominator
+	p.clock = options.Clock
+	p.stop = make(chan struct{})
+	p.podInitialBackoffDuration = options.PodInitialBackoffDuration
+	p.podMaxBackoffDuration = options.PodMaxBackoffDuration
+	p.activeQ = heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder())
+	p.unschedulableQ = newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder())
+	p.moveRequestCycle = -1
+	p.clusterEventMap = options.ClusterEventMap
+	p.cond.L = &p.lock
+	p.podBackoffQ = heap.NewWithRecorder(podInfoKeyFunc, p.podsCompareBackoffCompleted, metrics.NewBackoffPodsRecorder())
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector) {
-		pq.nsLister = informerFactory.Core().V1().Namespaces().Lister()
+		p.nsLister = informerFactory.Core().V1().Namespaces().Lister()
 	}
-
-	return pq
 }
 
 // Run starts the goroutine to pump from podBackoffQ to activeQ

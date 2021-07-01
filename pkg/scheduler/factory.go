@@ -46,8 +46,8 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 )
 
 // Binder knows how to write a binding.
@@ -138,7 +138,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 
 	// The nominator will be passed all the way to framework instantiation.
-	nominator := internalqueue.NewPodNominator(c.informerFactory.Core().V1().Pods().Lister())
+	nominator := schedulerqueue.NewPodNominator(c.informerFactory.Core().V1().Pods().Lister())
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithComponentConfigVersion(c.componentConfigVersion),
 		frameworkruntime.WithClientSet(c.client),
@@ -159,14 +159,19 @@ func (c *Configurator) create() (*Scheduler, error) {
 	}
 	// Profiles are required to have equivalent queue sort plugins.
 	lessFn := profiles[c.profiles[0].SchedulerName].QueueSortFunc()
-	podQueue := internalqueue.NewSchedulingQueue(
-		lessFn,
+
+	var podQueue schedulerqueue.SchedulingQueue
+	if c.registry.CustomQueue != nil {
+		podQueue = c.registry.CustomQueue
+	} else {
+		podQueue = schedulerqueue.NewSchedulingQueue()
+	}
+	podQueue.Init(lessFn,
 		c.informerFactory,
-		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
-		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
-		internalqueue.WithPodNominator(nominator),
-		internalqueue.WithClusterEventMap(c.clusterEventMap),
-	)
+		schedulerqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
+		schedulerqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
+		schedulerqueue.WithPodNominator(nominator),
+		schedulerqueue.WithClusterEventMap(c.clusterEventMap))
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
@@ -188,7 +193,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		Algorithm:       algo,
 		Extenders:       extenders,
 		Profiles:        profiles,
-		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
+		NextPod:         schedulerqueue.MakeNextPodFunc(podQueue),
 		Error:           MakeDefaultErrorFunc(c.client, c.informerFactory.Core().V1().Pods().Lister(), podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,
 		SchedulingQueue: podQueue,
@@ -326,7 +331,7 @@ func dedupPluginConfigs(pc []schedulerapi.PluginConfig) ([]schedulerapi.PluginCo
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodLister, podQueue schedulerqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.QueuedPodInfo, error) {
 	return func(podInfo *framework.QueuedPodInfo, err error) {
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {

@@ -34,8 +34,8 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 )
 
 const (
@@ -1479,7 +1479,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 				)
 			}
 
-			podNominator := internalqueue.NewPodNominator(nil)
+			podNominator := schedulerqueue.NewPodNominator(nil)
 			if tt.nominatedPod != nil {
 				podNominator.AddNominatedPod(framework.NewPodInfo(tt.nominatedPod), nodeName)
 			}

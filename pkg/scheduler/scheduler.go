@@ -49,9 +49,9 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
-	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -87,7 +87,7 @@ type Scheduler struct {
 	StopEverything <-chan struct{}
 
 	// SchedulingQueue holds pods to be scheduled
-	SchedulingQueue internalqueue.SchedulingQueue
+	SchedulingQueue schedulerqueue.SchedulingQueue
 
 	// Profiles are the scheduling profiles.
 	Profiles profile.Map
@@ -204,8 +204,8 @@ var defaultSchedulerOptions = schedulerOptions{
 		{SchedulerName: v1.DefaultSchedulerName},
 	},
 	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	podInitialBackoffSeconds: int64(schedulerqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:     int64(schedulerqueue.DefaultPodMaxBackoffDuration.Seconds()),
 	parallelism:              int32(parallelize.DefaultParallelism),
 }
 

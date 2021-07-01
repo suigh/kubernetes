@@ -56,10 +56,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	schedulerqueue "k8s.io/kubernetes/pkg/scheduler/queue"
 )
 
 // Option configures a framework.Registry.
-type Option func(runtime.Registry) error
+type Option func(*runtime.Registry) error
 
 // NewSchedulerCommand creates a *cobra.Command object with default parameters and registryOptions
 func NewSchedulerCommand(registryOptions ...Option) *cobra.Command {
@@ -297,8 +298,16 @@ func getRecorderFactory(cc *schedulerserverconfig.CompletedConfig) profile.Recor
 // WithPlugin creates an Option based on plugin name and factory. Please don't remove this function: it is used to register out-of-tree plugins,
 // hence there are no references to it from the kubernetes scheduler code base.
 func WithPlugin(name string, factory runtime.PluginFactory) Option {
-	return func(registry runtime.Registry) error {
+	return func(registry *runtime.Registry) error {
 		return registry.Register(name, factory)
+	}
+}
+
+// WithCustomQueue creates an Option based on custom queue. Please don't remove this function: it is used to register out-of-tree plugins,
+// hence there are no references to it from the kubernetes scheduler code base.
+func WithCustomQueue(customQueue schedulerqueue.SchedulingQueue) Option {
+	return func(registry *runtime.Registry) error {
+		return registry.SetCustomQueue(customQueue)
 	}
 }
 
@@ -316,7 +325,10 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	// Get the completed config
 	cc := c.Complete()
 
-	outOfTreeRegistry := make(runtime.Registry)
+	outOfTreeRegistry := &runtime.Registry{
+		Pf:          make(map[string]runtime.PluginFactory),
+		CustomQueue: nil,
+	}
 	for _, option := range outOfTreeRegistryOptions {
 		if err := option(outOfTreeRegistry); err != nil {
 			return nil, nil, err
@@ -335,7 +347,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),
 		scheduler.WithLegacyPolicySource(cc.LegacyPolicySource),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
+		scheduler.WithFrameworkOutOfTreeRegistry(*outOfTreeRegistry),
 		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
 		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 		scheduler.WithExtenders(cc.ComponentConfig.Extenders...),
